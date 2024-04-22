@@ -36,11 +36,12 @@ pub async fn login(
       .ok_or(LemmyErrorType::IncorrectLogin)?;
 
   // Verify the password
-  let valid: bool = verify(
-    &data.password,
-    &local_user_view.local_user.password_encrypted,
-  )
-  .unwrap_or(false);
+  let valid: bool = local_user_view.local_user.password_encrypted != ""
+    && verify(
+      &data.password,
+      &local_user_view.local_user.password_encrypted,
+    )
+    .unwrap_or(false);
   if !valid {
     Err(LemmyErrorType::IncorrectLogin)?
   }

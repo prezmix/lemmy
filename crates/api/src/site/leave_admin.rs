@@ -3,6 +3,7 @@ use lemmy_api_common::{context::LemmyContext, site::GetSiteResponse, utils::is_a
 use lemmy_db_schema::{
   source::{
     actor_language::SiteLanguage,
+    external_auth::ExternalAuth,
     language::Language,
     local_site_url_blocklist::LocalSiteUrlBlocklist,
     local_user::{LocalUser, LocalUserUpdateForm},
@@ -65,7 +66,7 @@ pub async fn leave_admin(
   let taglines = Tagline::get_all(&mut context.pool(), site_view.local_site.id).await?;
   let custom_emojis =
     CustomEmojiView::get_all(&mut context.pool(), site_view.local_site.id).await?;
-  let blocked_urls = LocalSiteUrlBlocklist::get_all(&mut context.pool()).await?;
+  let external_auths = ExternalAuth::get_all(&mut context.pool()).await?;
 
   Ok(Json(GetSiteResponse {
     site_view,
@@ -76,6 +77,6 @@ pub async fn leave_admin(
     discussion_languages,
     taglines,
     custom_emojis,
-    blocked_urls,
+    external_auths,
   }))
 }

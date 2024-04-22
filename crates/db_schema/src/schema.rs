@@ -284,6 +284,25 @@ diesel::table! {
 }
 
 diesel::table! {
+    external_auth (id) {
+        id -> Int4,
+        display_name -> Text,
+        #[max_length = 128]
+        auth_type -> Varchar,
+        auth_endpoint -> Text,
+        token_endpoint -> Text,
+        user_endpoint -> Text,
+        id_attribute -> Text,
+        issuer -> Text,
+        client_id -> Text,
+        client_secret -> Text,
+        scopes -> Text,
+        published -> Timestamptz,
+        updated -> Nullable<Timestamptz>,
+    }
+}
+
+diesel::table! {
     federation_allowlist (instance_id) {
         instance_id -> Int4,
         published -> Timestamptz,
@@ -382,8 +401,7 @@ diesel::table! {
         registration_mode -> RegistrationModeEnum,
         reports_email_admins -> Bool,
         federation_signed_fetch -> Bool,
-        default_post_listing_mode -> PostListingModeEnum,
-        default_sort_type -> SortTypeEnum,
+        oauth_registration -> Bool,
     }
 }
 
@@ -1052,6 +1070,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     custom_emoji,
     custom_emoji_keyword,
     email_verification,
+    external_auth,
     federation_allowlist,
     federation_blocklist,
     federation_queue_state,

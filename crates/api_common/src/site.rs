@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 use lemmy_db_schema::{
   newtypes::{CommentId, CommunityId, InstanceId, LanguageId, PersonId, PostId},
   source::{
+    external_auth::ExternalAuth,
     federation_queue_state::FederationQueueState,
     instance::Instance,
     language::Language,
@@ -192,8 +193,7 @@ pub struct CreateSite {
   pub blocked_instances: Option<Vec<String>>,
   pub taglines: Option<Vec<String>>,
   pub registration_mode: Option<RegistrationMode>,
-  pub content_warning: Option<String>,
-  pub default_post_listing_mode: Option<PostListingMode>,
+  pub oauth_registration: Option<bool>,
 }
 
 #[skip_serializing_none]
@@ -274,6 +274,8 @@ pub struct EditSite {
   /// A list of taglines shown at the top of the front page.
   pub taglines: Option<Vec<String>>,
   pub registration_mode: Option<RegistrationMode>,
+  /// Whether or not external auth methods can auto-register users.
+  pub oauth_registration: Option<bool>,
   /// Whether to email admins for new reports.
   pub reports_email_admins: Option<bool>,
   /// If present, nsfw content is visible by default. Should be displayed by frontends/clients
@@ -308,7 +310,8 @@ pub struct GetSiteResponse {
   pub taglines: Vec<Tagline>,
   /// A list of custom emojis your site supports.
   pub custom_emojis: Vec<CustomEmojiView>,
-  pub blocked_urls: Vec<LocalSiteUrlBlocklist>,
+  /// A list of external auth methods your site supports.
+  pub external_auths: Vec<ExternalAuth>,
 }
 
 #[skip_serializing_none]

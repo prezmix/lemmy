@@ -18,9 +18,10 @@ use lemmy_api_common::{
 };
 use lemmy_db_schema::{
   aggregates::structs::PersonAggregates,
+  newtypes::InstanceId,
   source::{
     captcha_answer::{CaptchaAnswer, CheckCaptchaAnswer},
-    language::Language,
+    local_site::LocalSite,
     local_user::{LocalUser, LocalUserInsertForm},
     local_user_vote_display_mode::LocalUserVoteDisplayMode,
     person::{Person, PersonInsertForm},
@@ -39,7 +40,6 @@ use lemmy_utils::{
 };
 use std::collections::HashSet;
 
-#[tracing::instrument(skip(context))]
 pub async fn register(
   data: Json<Register>,
   req: HttpRequest,
@@ -95,14 +95,6 @@ pub async fn register(
   check_slurs(&data.username, &slur_regex)?;
   check_slurs_opt(&data.answer, &slur_regex)?;
 
-  let actor_keypair = generate_actor_keypair()?;
-  is_valid_actor_name(&data.username, local_site.actor_name_max_length as usize)?;
-  let actor_id = generate_local_apub_endpoint(
-    EndpointType::Person,
-    &data.username,
-    &context.settings().get_protocol_and_hostname(),
-  )?;
-
   if let Some(email) = &data.email {
     if LocalUser::is_email_taken(&mut context.pool(), email).await? {
       Err(LemmyErrorType::EmailAlreadyExists)?
@@ -110,22 +102,13 @@ pub async fn register(
   }
 
   // We have to create both a person, and local_user
-
-  // Register the new person
-  let person_form = PersonInsertForm::builder()
-    .name(data.username.clone())
-    .actor_id(Some(actor_id.clone()))
-    .private_key(Some(actor_keypair.private_key))
-    .public_key(actor_keypair.public_key)
-    .inbox_url(Some(generate_inbox_url(&actor_id)?))
-    .shared_inbox_url(Some(generate_shared_inbox_url(context.settings())?))
-    .instance_id(site_view.site.instance_id)
-    .build();
-
-  // insert the person
-  let inserted_person = Person::create(&mut context.pool(), &person_form)
-    .await
-    .with_lemmy_type(LemmyErrorType::UserAlreadyExists)?;
+  let inserted_person = create_person(
+    data.username.clone(),
+    &local_site,
+    site_view.site.instance_id,
+    &context,
+  )
+  .await?;
 
   // Automatically set their application as accepted, if they created this with open registration.
   // Also fixes a bug which allows users to log in when registrations are changed to closed.
@@ -229,4 +212,69 @@ pub async fn register(
   }
 
   Ok(Json(login_response))
+}
+
+#[tracing::instrument(skip(context))]
+pub async fn register_from_oauth(
+  username: String,
+  email: String,
+  context: &Data<LemmyContext>,
+) -> Result<LocalUser, LemmyError> {
+  let site_view = SiteView::read_local(&mut context.pool()).await?;
+  let local_site = site_view.local_site;
+
+  let slur_regex = local_site_to_slur_regex(&local_site);
+  check_slurs(&username, &slur_regex)?;
+
+  // We have to create both a person, and local_user
+  let inserted_person =
+    create_person(username, &local_site, site_view.site.instance_id, &context).await?;
+
+  // Create the local user
+  let local_user_form = LocalUserInsertForm::builder()
+    .person_id(inserted_person.id)
+    .email(Some(str::to_lowercase(&email)))
+    .password_encrypted("".to_string())
+    .show_nsfw(Some(false))
+    .accepted_application(Some(true))
+    .email_verified(Some(true))
+    .default_listing_type(Some(local_site.default_post_listing_type))
+    // If its the initial site setup, they are an admin
+    .admin(Some(!local_site.site_setup))
+    .build();
+
+  let inserted_local_user = LocalUser::create(&mut context.pool(), &local_user_form).await?;
+  Ok(inserted_local_user)
+}
+
+async fn create_person(
+  username: String,
+  local_site: &LocalSite,
+  instance_id: InstanceId,
+  context: &Data<LemmyContext>,
+) -> Result<Person, LemmyError> {
+  let actor_keypair = generate_actor_keypair()?;
+  is_valid_actor_name(&username, local_site.actor_name_max_length as usize)?;
+  let actor_id = generate_local_apub_endpoint(
+    EndpointType::Person,
+    &username,
+    &context.settings().get_protocol_and_hostname(),
+  )?;
+
+  // Register the new person
+  let person_form = PersonInsertForm::builder()
+    .name(username)
+    .actor_id(Some(actor_id.clone()))
+    .private_key(Some(actor_keypair.private_key))
+    .public_key(actor_keypair.public_key)
+    .inbox_url(Some(generate_inbox_url(&actor_id)?))
+    .shared_inbox_url(Some(generate_shared_inbox_url(context.settings())?))
+    .instance_id(instance_id)
+    .build();
+
+  // insert the person
+  let inserted_person = Person::create(&mut context.pool(), &person_form)
+    .await
+    .with_lemmy_type(LemmyErrorType::UserAlreadyExists)?;
+  Ok(inserted_person)
 }

@@ -5,6 +5,7 @@ use lemmy_api_common::{
 };
 use lemmy_db_schema::source::{
   actor_language::{LocalUserLanguage, SiteLanguage},
+  external_auth::ExternalAuth,
   language::Language,
   local_site_url_blocklist::LocalSiteUrlBlocklist,
   tagline::Tagline,
@@ -102,5 +103,21 @@ pub async fn get_site(
     None
   };
 
-  Ok(Json(site_response))
+  let all_languages = Language::read_all(&mut context.pool()).await?;
+  let discussion_languages = SiteLanguage::read_local_raw(&mut context.pool()).await?;
+  let taglines = Tagline::get_all(&mut context.pool(), site_view.local_site.id).await?;
+  let custom_emojis =
+    CustomEmojiView::get_all(&mut context.pool(), site_view.local_site.id).await?;
+  let external_auths = ExternalAuth::get_all(&mut context.pool()).await?;
+
+  Ok(Json(GetSiteResponse {
+    site_view,
+    admins,
+    version: version::VERSION.to_string(),
+    my_user,
+    all_languages,
+    discussion_languages,
+    taglines,
+    custom_emojis,
+  }))
 }

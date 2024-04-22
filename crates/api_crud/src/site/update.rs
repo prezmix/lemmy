@@ -113,6 +113,7 @@ pub async fn update_site(
     federation_enabled: data.federation_enabled,
     captcha_enabled: data.captcha_enabled,
     captcha_difficulty: data.captcha_difficulty.clone(),
+    oauth_registration: data.oauth_registration,
     reports_email_admins: data.reports_email_admins,
     default_post_listing_mode: data.default_post_listing_mode,
     ..Default::default()
@@ -599,6 +600,7 @@ mod tests {
       blocked_urls: None,
       taglines: None,
       registration_mode: site_registration_mode,
+      oauth_registration: None,
       reports_email_admins: None,
       content_warning: None,
       default_post_listing_mode: None,
